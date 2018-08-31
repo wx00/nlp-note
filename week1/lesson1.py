@@ -2,7 +2,7 @@ import nltk
 
 # nltk.download('wordnet')
 
-text = "the quick brown foxes jumps over the lazy dog"
+text = "the quick brown foxes suddenly 100 jumps over the lazy dog, do you see?"
 
 # 分词
 to = nltk.tokenize.TreebankWordTokenizer()
@@ -20,6 +20,17 @@ print([" ".join(st.stem(token) for token in tokens)])
 # 词型还原：恢复成字典形式
 lem = nltk.stem.WordNetLemmatizer()
 print([" ".join(lem.lemmatize(token) for token in tokens)])
+
+# import re
+# regex = re.compile('^[0-9]+$')
+# token = nltk.tokenize.TreebankWordTokenizer()
+# lemma = nltk.stem.WordNetLemmatizer()
+#
+# def tokenizer(text):
+#     tokens = token.tokenize(text)
+#     return tuple(map(lemma.lemmatize, filter(lambda t: not regex.match(t), tokens)))
+#
+# print(tokenizer(text))
 
 # capital letter
 # 首字母小写化
