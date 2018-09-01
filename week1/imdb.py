@@ -22,6 +22,44 @@ def load_doc(prof, label):
     return documents
 
 
+def shuffle_feat(feat_pos, feat_neg, batch_size, feat_repo, prefix):
+
+    num_pos, num_neg = feat_pos.shape[0], feat_neg.shape[0]
+    total_num = num_pos + num_neg
+    batch_size = min(total_num, batch_size)
+
+    ratio = num_pos / total_num
+    batch_pos = int(ratio * batch_size)
+    batch_neg = batch_size - batch_pos
+
+    batch_num = total_num // batch_size
+    assert num_pos // batch_pos == num_neg // batch_neg == batch_num
+
+    feat_fmt, label_fmt = prefix + '-feat-{0}', prefix + '-label-{0}'
+    for i in range(batch_num):
+        feat_name, label_name = feat_fmt.format(i), label_fmt.format(i)
+
+        s_pos = slice(i * batch_pos, min((i+1)*batch_pos, num_pos))
+        s_neg = slice(i * batch_neg, min((i+1)*batch_neg, num_neg))
+        pos, neg = pd.SparseDataFrame(feat_pos[s_pos], default_fill_value=.0), \
+                   pd.SparseDataFrame(feat_neg[s_neg], default_fill_value=.0)
+        pd.concat((pos, neg)).astype(np.float32).to_pickle(feat_repo + feat_name)
+        pos_len, neg_len = len(pos), len(neg)
+        del pos, neg
+
+        pos, neg = pd.Series(np.ones(pos_len)), pd.SparseSeries(np.zeros(neg_len))
+        pd.concat((pos, neg)).to_pickle(feat_repo + label_name)
+        del pos, neg
+
+        print("batch[{0}]: {1}-{2} {3}-{4}".format(
+            i, s_pos.start, s_pos.stop, s_neg.start, s_neg.stop))
+
+    pd.DataFrame(
+        data=np.array([[batch_num, batch_size, feat_fmt, label_fmt]]),
+        columns=('batch_num', 'batch_size', 'feat_fmt', 'label_fmt')
+    ).to_pickle(feat_repo + prefix + '-meta')
+
+
 def extract_feat(bi_gram=True, custom_tokenizer=False):
 
     regex = re.compile('^[0-9/]+$')
@@ -45,52 +83,37 @@ def extract_feat(bi_gram=True, custom_tokenizer=False):
     raw_doc = np.concatenate((train_pos, train_neg, test_pos, test_neg))
 
     encoder = TfidfVectorizer(min_df=5, max_df=.5, stop_words=stopwords.words(),
-                              ngram_range=(1, 2) if bi_gram else None,
+                              ngram_range=(1, 2 if bi_gram else 1),
                               tokenizer=tokenizer if custom_tokenizer else None)
     features = encoder.fit_transform(raw_doc)
     vocabulary = encoder.get_feature_names()
 
     np.save(feat_base + 'dict.npy', vocabulary)
 
-    train_pos_mat = pd.SparseDataFrame(
-        features[train_pos_range], columns=encoder.get_feature_names(), default_fill_value=.0)
-    train_neg_mat = pd.SparseDataFrame(
-        features[train_neg_range], columns=encoder.get_feature_names(), default_fill_value=.0)
-    test_pos_mat = pd.SparseDataFrame(
-        features[test_pos_range], columns=encoder.get_feature_names(), default_fill_value=.0)
-    test_neg_mat = pd.SparseDataFrame(
-        features[test_neg_range], columns=encoder.get_feature_names(), default_fill_value=.0)
+    shuffle_feat(features[train_pos_range], features[train_neg_range],
+                 3000, feat_base, 'train')
 
-    train_pos_mat.to_pickle(feat_base + 'train_pos')
-    train_neg_mat.to_pickle(feat_base + 'train_neg')
-    test_pos_mat.to_pickle(feat_base + 'test_pos')
-    test_neg_mat.to_pickle(feat_base + 'test_neg')
+    shuffle_feat(features[test_pos_range], features[test_neg_range],
+                 5000, feat_base, 'test')
+
+    # for n, s in {'train_pos': train_pos_range,
+    #              'train_neg': train_neg_range,
+    #              'test_pos': test_pos_range,
+    #              'test_neg': test_neg_range}.items():
+    #     print('saving {0}'.format(n))
+    #     mat = pd.SparseDataFrame(features[s], columns=encoder.get_feature_names())
+    #     mat.to_csv(feat_base + '{0}.csv'.format(n))  # mat.to_pickle(feat_base + n)
+    #     del mat
+    #     print('done {0}'.format(n))
 
 
 if __name__ == '__main__':
-    extract_feat()
-    data = pd.read_pickle(feat_base + 'train_pos')
-    print(type(data))
-    print(data.shape)
-    print(data)
+    extract_feat(bi_gram=False)
+    meta = pd.read_pickle(feat_base + 'train-meta')
+    print(meta['batch_num'], meta['batch_size'], meta['feat_fmt'], meta['label_fmt'])
 
-    # train_pos = load_doc('train', 'pos')
-    # encoder = TfidfVectorizer(min_df=5, stop_words=stopwords.words())
-    # features = encoder.fit_transform(train_pos)
-    # vocabulary = encoder.get_feature_names()
-    # np.save(feat_base + 'dict.npy', vocabulary)
-    #
-    # train_pos_mat = pd.SparseDataFrame(
-    #     features.todense(), columns=encoder.get_feature_names(), default_fill_value=.0)
-    #
-    # train_pos_mat.to_pickle(feat_base + 'train_pos')
-    #
-    # data = pd.read_pickle(feat_base + 'train_pos')
-    # print(type(data))
-    # print(data.shape)
-    # print(data)
-
-    pass
+    meta = pd.read_pickle(feat_base + 'test-meta')
+    print(meta['batch_num'], meta['batch_size'], meta['feat_fmt'], meta['label_fmt'])
 
 # a = ['00',  '000',  '001', '0a', '0zwi0ck0']
 # x = re.compile('^[0-9]+$')

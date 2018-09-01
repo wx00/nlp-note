@@ -9,36 +9,27 @@ from week1 import feat_base
 
 
 def train():
-    train_pos = pd.read_pickle(feat_base + 'train_pos')
-    train_neg = pd.read_pickle(feat_base + 'train_neg')
-    samples = pd.concat([train_pos, train_neg], axis=0).to_coo().astype('float32')
-    targets = np.concatenate((np.ones(len(train_pos), dtype=np.int8),
-                              np.zeros(len(train_neg), dtype=np.int8)))
-    del train_pos, train_neg
+    meta = pd.read_pickle(feat_base + 'train-meta').iloc[0]
+    batch_num, batch_size = int(meta['batch_num']), int(meta['batch_size'])
+    feat_fmt, label_fmt = meta['feat_fmt'], meta['label_fmt']
 
-    print('training started')
     model = LogisticRegression(penalty='l1', max_iter=200)
 
-    batch = 3000
-    total = samples.shape[0]
-    samples_csr = samples.tocsr()
-
-    # TODO(Tommy): fix training process:
-    # svm needs samples of at least 2 classes in the data.
-    for i in range(0, total, batch):
-        batch_max = min(i + batch, total)
-        batch_samples = np.array([samples_csr.getrow(r).toarray().reshape((-1,))
-                                  for r in range(i, batch_max)])
-        model.fit(batch_samples, targets[slice(i, batch_max)])
-        del batch_max, batch_samples
-
+    print('training started')
+    for i in range(batch_num):
+        samples = pd.read_pickle(feat_base + feat_fmt.format(i)).to_coo().tocsr()
+        targets = pd.read_pickle(feat_base + label_fmt.format(i)).values
+        print(samples)
+        print(targets)
+        model.fit(samples, targets)
+        del samples, targets
     print('training finished')
 
     model.sparsify()
     joblib.dump(model, feat_base + 'model.pickle')
 
 
-def test():
+def validate():
     vocabulary = np.load(feat_base + 'dict.npy')
     print(vocabulary)
 
@@ -65,4 +56,4 @@ def test():
 
 if __name__ == '__main__':
     train()
-    # test()
+    # validate()
