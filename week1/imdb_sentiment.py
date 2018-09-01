@@ -17,10 +17,9 @@ def train():
 
     print('training started')
     for i in range(batch_num):
+        print('train epoch {0}'.format(i+1))
         samples = pd.read_pickle(feat_base + feat_fmt.format(i)).to_coo().tocsr()
-        targets = pd.read_pickle(feat_base + label_fmt.format(i)).values
-        print(samples)
-        print(targets)
+        targets = np.array(pd.read_pickle(feat_base + label_fmt.format(i)))
         model.fit(samples, targets)
         del samples, targets
     print('training finished')
@@ -31,29 +30,39 @@ def train():
 
 def validate():
     vocabulary = np.load(feat_base + 'dict.npy')
-    print(vocabulary)
-
     model = joblib.load(feat_base + 'model.pickle')
-    weight = model.coef_.reshape((-1,))
+    weight = model.coef_.toarray().reshape((-1,))
     print(weight.shape)
     index = weight.argsort()[::-1]
     best5 = zip(vocabulary[index[0:5]], weight[index[0:5]])
     worst5 = zip(vocabulary[index[-5:]], weight[index[-5:]])
     print(list(best5))
     print(list(worst5)[::-1])
+    del index, vocabulary
 
-    test_pos = pd.read_pickle(feat_base + 'test_pos')
-    test_neg = pd.read_pickle(feat_base + 'test_neg')
-    samples = np.concatenate((test_pos.values, test_neg.values))
-    targets = np.concatenate((np.ones(len(test_pos)), np.zeros(len(test_neg))))
-    predict = model.predict(samples)
+    meta = pd.read_pickle(feat_base + 'test-meta').iloc[0]
+    batch_num, batch_size = int(meta['batch_num']), int(meta['batch_size'])
+    feat_fmt, label_fmt = meta['feat_fmt'], meta['label_fmt']
 
-    accuracy = accuracy_score(targets, predict)
-    print('accuracy : {0}'.format(accuracy))
-    recall = recall_score(targets, predict, (0, 1))
-    print('recall : {0}'.format(recall))
+    score = []
+    print('test started')
+    for i in range(batch_num):
+        print('test epoch {0}'.format(i + 1))
+        samples = pd.read_pickle(feat_base + feat_fmt.format(i)).to_coo().tocsr()
+        targets = np.array(pd.read_pickle(feat_base + label_fmt.format(i)))
+        predict = model.predict(samples)
+        score.append((len(predict), accuracy_score(targets, predict), recall_score(targets, predict)))
+        del samples, targets
+    print('test finished')
+
+    print(score)
+    num, accuracy, recall = zip(*score)
+    num = np.array(num)
+    w = num / num.sum()
+    print('accuracy : {0}'.format((np.array(accuracy) * w).sum()))
+    print('recall : {0}'.format((np.array(recall) * w).sum()))
 
 
 if __name__ == '__main__':
-    train()
-    # validate()
+    # train()
+    validate()
