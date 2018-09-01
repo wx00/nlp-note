@@ -91,7 +91,7 @@ def extract_feat(bi_gram=True, custom_tokenizer=False):
     np.save(feat_base + 'dict.npy', vocabulary)
 
     shuffle_feat(features[train_pos_range], features[train_neg_range],
-                 3000, feat_base, 'train')
+                 5000, feat_base, 'train')
 
     shuffle_feat(features[test_pos_range], features[test_neg_range],
                  5000, feat_base, 'test')
