@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.externals import joblib
 from sklearn.metrics import accuracy_score, f1_score, recall_score, roc_auc_score, average_precision_score
 
@@ -13,14 +13,15 @@ def train():
     batch_num, batch_size = int(meta['batch_num']), int(meta['batch_size'])
     feat_fmt, label_fmt = meta['feat_fmt'], meta['label_fmt']
 
-    model = LogisticRegression(penalty='l1', max_iter=200)
+    # model = LogisticRegression(penalty='l1')
+    model = SGDClassifier(loss='log', penalty='l1')
 
     print('training started')
     for i in range(batch_num):
         print('train epoch {0}'.format(i+1))
         samples = pd.read_pickle(feat_base + feat_fmt.format(i)).to_coo().tocsr()
         targets = np.array(pd.read_pickle(feat_base + label_fmt.format(i)))
-        model.fit(samples, targets)
+        model.partial_fit(samples, targets, classes=(0, 1))
         del samples, targets
     print('training finished')
 
@@ -64,5 +65,5 @@ def validate():
 
 
 if __name__ == '__main__':
-    # train()
+    train()
     validate()

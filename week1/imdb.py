@@ -96,19 +96,9 @@ def extract_feat(bi_gram=True, custom_tokenizer=False):
     shuffle_feat(features[test_pos_range], features[test_neg_range],
                  5000, feat_base, 'test')
 
-    # for n, s in {'train_pos': train_pos_range,
-    #              'train_neg': train_neg_range,
-    #              'test_pos': test_pos_range,
-    #              'test_neg': test_neg_range}.items():
-    #     print('saving {0}'.format(n))
-    #     mat = pd.SparseDataFrame(features[s], columns=encoder.get_feature_names())
-    #     mat.to_csv(feat_base + '{0}.csv'.format(n))  # mat.to_pickle(feat_base + n)
-    #     del mat
-    #     print('done {0}'.format(n))
-
 
 if __name__ == '__main__':
-    extract_feat(bi_gram=False)
+    extract_feat()
     meta = pd.read_pickle(feat_base + 'train-meta')
     print(meta['batch_num'], meta['batch_size'], meta['feat_fmt'], meta['label_fmt'])
 
