@@ -11,5 +11,5 @@ if platform.system() == 'Windows':
     raw_base = "D:/Dataset/aclImdb/"
     feat_base = "D:/Dataset/imdb/"
 else:
-    raw_base = '~/aclImdb/'
-    feat_base = '~/imdb/'
+    raw_base = '~/data/aclImdb/'
+    feat_base = '~/data/imdb/'
