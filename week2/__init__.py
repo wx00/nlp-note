@@ -1,15 +1,19 @@
 from enum import Enum
+import os
 import logging
 import platform
 
 log = logging.getLogger('Week2')
 
 if platform.system() == 'Windows':
-    raw_base = "D:/Dataset/icwb2-data/"
-    feat_base = "D:/Dataset/icwb2/"
+    han_base = "D:/Dataset/Unihan"
+    raw_base = "D:/Dataset/icwb2-data"
+    feat_base = "D:/Dataset/icwb2"
 else:
-    raw_base = '~/data/icwb2-data/'
-    feat_base = '~/data/icwb2/'
+    home = os.path.expanduser('~')
+    han_base = f'{home}/data/Unihan'
+    raw_base = f'{home}/data/icwb2-data'
+    feat_base = f'{home}/data/icwb2'
 
 
 class Tag(Enum):

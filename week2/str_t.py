@@ -54,3 +54,4 @@ def m2():
 # print(x.match(' '))
 
 
+print(ord('好'), chr(ord('好')))
