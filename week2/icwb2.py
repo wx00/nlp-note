@@ -2,6 +2,7 @@ import os
 import re
 import bisect
 import numpy as np
+import pandas as pd
 
 from week2 import han_base, raw_base, feat_base, Tag
 
@@ -63,7 +64,7 @@ def list_training_doc(tag=False):
                     tags.append(Tag.END.value)
         return words, tags if tag else words
 
-    def document(file):
+    def iter_document(file):
         with open(file, encoding='utf-8') as ff:
             line = ff.readline()
             while line:
@@ -73,18 +74,79 @@ def list_training_doc(tag=False):
     f = '{0}_training.utf8'
     fmt = f'{raw_base}/training/{f}'
     files = [fmt.format(i) for i in ['as', 'cityu', 'msr', 'pku']]
-    return [document(f) for f in files]
+    return [iter_document(f) for f in files]
 
 
 def list_test_doc():
-    pass
-    # [f for f in list_file('testing', 'test')]
-    # [f for f in list_file('gold', 'test_gold')]
+    f = '{0}_test.utf8'
+    fmt = f'{raw_base}/testing/{f}'
+    test = [fmt.format(i) for i in ['as', 'cityu', 'msr', 'pku']]
+
+    f = '{0}_test_gold.utf8'
+    fmt = f'{raw_base}/gold/{f}'
+    gold = [f'{raw_base}/gold/as_testing_gold.utf8'] + \
+           [fmt.format(i) for i in ['cityu', 'msr', 'pku']]
+
+    def iter_document(sample, target):
+        with open(sample, encoding='utf-8') as fs, open(target, encoding='utf-8') as ft:
+            ls, lt = fs.readline(), ft.readline()
+            assert (ls and lt) or (not ls and not lt)
+            while ls or lt:
+                assert ls and lt
+                yield ls, lt
+                ls, lt = fs.readline(), ft.readline()
+
+    return [iter_document(t, g) for t, g in zip(test, gold)]
+
+
+def extract_training_feat(lines_per_chunk=50000):
+
+    vocabulary = np.load(f'{feat_base}/vocabulary.npy')
+    word_set = set(vocabulary.tolist())
+
+    def encode(c):
+        o = ord(c)
+        assert o in word_set
+        return np.searchsorted(vocabulary, o)
+
+    chunk_num = 0
+    chunk_fmt = 'train-chunk-{0}.npy'
+
+    chunk_name = f'{feat_base}/{chunk_fmt}'
+
+    count, x_buff, y_buff = lines_per_chunk, [], []
+    train_set = list_training_doc(tag=True)
+    for doc in train_set:
+        for words, tags in doc:
+            x_buff.extend(encode(c) for c in words)
+            y_buff.extend(tags)
+            count -= 1
+            if not count:
+                count = lines_per_chunk
+                chunk = np.array([x_buff, y_buff])
+                np.save(chunk_name.format(chunk_num), chunk)
+                x_buff.clear()
+                y_buff.clear()
+                chunk_num += 1
+
+    if count < lines_per_chunk:
+        chunk = np.array([x_buff, y_buff])
+        np.save(chunk_name.format(chunk_num), chunk)
+        chunk_num += 1
+
+    pd.DataFrame(
+        data=np.array([[chunk_num, chunk_fmt]]),
+        columns=('chunk_num', 'chunk_fmt')
+    ).to_pickle(f'{feat_base}/train-meta')
 
 
 if __name__ == '__main__':
-    x = list_training_doc()[0]
-    for y in x:
-        print(y)
+    extract_training_feat()
+    # for doc in list_test_doc():
+    #     for x, y in doc:
+    #         print(x)
+    # x = list_training_doc()[0]
+    # for y in x:
+    #     print(y)
     pass
 
