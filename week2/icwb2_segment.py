@@ -65,7 +65,6 @@ def train(smooth_k=None):
 
 
 def viterbi_search(seq, state_prob_mat, output_prob_mat):
-
     t = len(seq)
     assert t > 1
 
@@ -123,24 +122,41 @@ def validate():
 
         return tokens
 
+    def shrink(tags):
+        idx, mixture = None, []
+        for i in range(len(tags)):
+            if tags[i] in (Tag.FIN.value, Tag.END.value):
+                mixture.append((i if idx is None else idx << 32) | i)
+                # pos.append((i if idx is None else idx, i))
+                idx = None
+            elif idx is None:
+                idx = i
+        if idx is not None:
+            mixture.append((idx << 32) | (len(tags) - 1))
+            # pos.append((idx, len(tags)-1))
+        return set(mixture)
+        # return pos
+
     for doc in list_test_doc():
         for x, y in doc:
             sample = traverse_doc(x, [], None, converter=ch_to_int)
             target = traverse_doc(y, None, [])
+            if len(sample) < 2:
+                continue
+
             guess = viterbi_search(sample, state_trans_mat, output_prob_mat)
-            print(decode(x, guess))
-            print(y)
-            break
+            predict, expect = shrink(guess), shrink(target)
+
+            diff = predict.difference(expect)
+            err_num, right_num = len(diff), len(predict) - len(diff)
+            # if len(diff) > 5:
+            #     print(decode(x, guess))
+            #     print(y)
 
 
 if __name__ == '__main__':
     # train(smooth_k=np.array([1, 1, 10000000000, 1]))
     validate()
-
-    # x = np.array([[1,2,3], [4,5,6], [4,2,6]])
-    # print(x[[1,2]][[0,1]])
-    # print(x[[1, 2],[0, 1]])
-
     pass
 
 
