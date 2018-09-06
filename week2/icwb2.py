@@ -115,7 +115,7 @@ def list_test_doc():
     return [iter_document(t, g) for t, g in zip(test, gold)]
 
 
-def extract_training_feat(words_per_chunk=1500000):
+def extract_training_feat(words_per_chunk=2000000):
 
     vocabulary = np.load(f'{feat_base}/vocabulary.npy')
     word_set = set(vocabulary.tolist())

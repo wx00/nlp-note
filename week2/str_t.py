@@ -1,7 +1,7 @@
 
-import io
+import sys
 import re
-from array import array
+import numpy as np
 
 from week2 import feat_base, Tag, UNK
 
@@ -26,7 +26,7 @@ def method7():
 
 loop_count = 800000
 
-print( sys.version)
+print(sys.version)
 
 
 # print(  'method4=', timeit.timeit(method4, number=10))

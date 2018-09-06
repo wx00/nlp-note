@@ -4,6 +4,7 @@ import pandas as pd
 from week2 import feat_base, Tag, UNK
 from week2.icwb2 import list_test_doc, traverse_doc
 
+
 def load_training_sequence():
 
     meta = pd.read_pickle(f'{feat_base}/train-meta').iloc[0]
@@ -65,12 +66,6 @@ def train(smooth_k=None):
 
 def viterbi_search(seq, state_prob_mat, output_prob_mat):
 
-    def calc_state_prob(prev_state):
-        return state_prob_mat[prev_state+1]
-
-    def calc_output_prob(cur_output):
-        return output_prob_mat[:, cur_output]
-
     t = len(seq)
     assert t > 1
 
@@ -79,18 +74,17 @@ def viterbi_search(seq, state_prob_mat, output_prob_mat):
 
     prev_state = [Tag.SEP.value] * 4
     for i in range(t):
-        output_prob = calc_output_prob(seq[i])
-        state_prob = [calc_state_prob(s) * output_prob for s in prev_state]
+        output_prob = output_prob_mat[:, seq[i]]
+        state_prob = state_prob_mat[prev_state] * output_prob
+        max_prob_state = np.argmax(state_prob, axis=1).tolist()
+        max_prob = state_prob[range(4), max_prob_state]
 
-        max_prob_state = [np.argmax(p) for p in state_prob]
-        max_prob = [np.max(p) for p in state_prob]
-
-        state_trace.append(max_prob_state)
         if i == 0:
             prob_trace[0, :] = max_prob
         else:
             prob_trace[i, :] = prob_trace[i-1, :] * max_prob
 
+        state_trace.append(max_prob_state)
         prev_state = max_prob_state
 
     i = np.argmax(prob_trace[-1])
@@ -142,6 +136,11 @@ def validate():
 if __name__ == '__main__':
     # train(smooth_k=np.array([1, 1, 10000000000, 1]))
     validate()
+
+    # x = np.array([[1,2,3], [4,5,6], [4,2,6]])
+    # print(x[[1,2]][[0,1]])
+    # print(x[[1, 2],[0, 1]])
+
     pass
 
 
