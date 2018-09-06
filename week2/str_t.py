@@ -3,7 +3,7 @@ import io
 import re
 from array import array
 
-import sys, timeit
+from week2 import feat_base, Tag, UNK
 
 
 def method4():
@@ -55,3 +55,29 @@ def m2():
 
 
 print(ord('好'), chr(ord('好')))
+
+
+def some():
+
+    # bi_state_count = np.load(f'{feat_base}/state_count.npy')
+    # bi_output_count = np.load(f'{feat_base}/output_count.npy')
+
+    # vocabulary = np.load(f'{feat_base}/vocabulary.npy')
+    # state_num, output_num = len(Tag) - 1, len(vocabulary)
+    # x = bi_output_count[2]
+    # print(x.max() - x.sum())
+    # k = 10000000000
+    # with np.errstate(divide='ignore', invalid='ignore'):
+    #     laplace_numerator = x + k
+    #     laplace_denominator = x.sum() + (output_num * k)
+    #     y = laplace_numerator / laplace_denominator
+    #     z = 1. - y.sum()
+    # print(y, x.sum(), y.sum(), z)
+
+    # state_trans_mat = np.load(f'{feat_base}/state_trans.npy')
+    # output_prob_mat = np.load(f'{feat_base}/output_prob.npy')
+    # print(state_trans_mat.shape)
+    # print(output_prob_mat.shape)
+    # print(state_trans_mat.sum(axis=1))
+    # print(output_prob_mat[:, -1])
+    pass

@@ -15,9 +15,13 @@ else:
     raw_base = f'{home}/data/icwb2-data'
     feat_base = f'{home}/data/icwb2'
 
+UNK = -1
+
 
 class Tag(Enum):
+    SEP = -1  # State0
     FIN = 0
     BEG = 1
     MID = 2
     END = 3
+
