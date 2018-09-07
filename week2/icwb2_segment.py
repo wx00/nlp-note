@@ -78,30 +78,35 @@ def train(smooth_output=None, smooth_state=None):
     np.save(f'{feat_base}/output_emit.npy', output_emit_mat)
 
 
-def viterbi_search(seq, state_prob_mat, output_prob_mat):
-    t = len(seq)
-    assert t > 1
+def viterbi_search(seq, state0_prob, trans_prob_mat, emit_prob_mat):
+    n = len(seq)
+    assert n > 1
 
     state_trace = []
-    prob_trace = np.zeros((t, 4))
+    max_prob_trace = np.zeros((n, 4))
+    max_prob_trace[0, :] = state0_prob + emit_prob_mat[:, seq[0]]
 
-    prev_state = [Tag.SEP.value] * 4
-    for i in range(t):
-        output_prob = output_prob_mat[:, seq[i]]
-        state_prob = state_prob_mat[prev_state] * output_prob
-        max_prob_state = np.argmax(state_prob, axis=1).tolist()
-        max_prob = state_prob[range(4), max_prob_state]
+    for t in range(1, n):
+        emit_prob = emit_prob_mat[:, seq[t]]  # prob([F, B, M, E] -> seq[t])
+        prev_prob = max_prob_trace[t-1, :]  # max_prob([F, B, M, E])
 
-        if i == 0:
-            prob_trace[0, :] = max_prob
-        else:
-            prob_trace[i, :] = prob_trace[i-1, :] * max_prob
+        max_prev_state = [Tag.SEP.value] * 4
+        for k in range(4):
+            trans_prob = trans_prob_mat[:, k]  # prob([F, B, M, E] -> k)
+            # max_prob([F, B, M, E]) * prob([F, B, M, E] -> k) * prob(k -> seq[t])
+            prob_k = prev_prob + trans_prob + emit_prob[k]
+            max_prev_state[k] = np.argmax(prob_k)
+            max_prob_trace[t, k] = prob_k[max_prev_state[k]]
+        state_trace.append(max_prev_state)
 
-        state_trace.append(max_prob_state)
-        prev_state = max_prob_state
+    m = np.argmax(max_prob_trace[-1])
+    max_path = [m]
+    for i in range(n-2, -1, -1):
+        m = state_trace[i][m]
+        max_path.append(m)
 
-    i = np.argmax(prob_trace[-1])
-    return list(zip(*state_trace))[i]
+    max_path.reverse()
+    return max_path
 
 
 def validate():
@@ -114,6 +119,10 @@ def validate():
     # print(state_trans_mat)
     # print(output_emit_mat.sum(axis=1))
     # print(output_emit_mat)
+    # exit(0)
+
+    state_trans_mat = np.log(state_trans_mat)
+    output_emit_mat = np.log(output_emit_mat)
 
     vocabulary = np.load(f'{feat_base}/vocabulary.npy')
     word_set = set(vocabulary.tolist())
@@ -159,7 +168,8 @@ def validate():
             if len(sample) < 2:
                 continue
 
-            guess = viterbi_search(sample, state_trans_mat, output_emit_mat)
+            guess = viterbi_search(
+                sample, state_trans_mat[-1], state_trans_mat[:-1], output_emit_mat)
             # print(decode(sample, guess))
 
             predict, expect = shrink(guess), shrink(target)
@@ -177,7 +187,6 @@ def validate():
 
 if __name__ == '__main__':
     # train(smooth_output=np.array([1, 1, 10000000000, 1]))
-    # train(smooth_state=1)
     validate()
     pass
 
