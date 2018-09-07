@@ -115,7 +115,7 @@ def list_test_doc():
     return [iter_document(t, g) for t, g in zip(test, gold)]
 
 
-def extract_training_feat(words_per_chunk=2000000):
+def extract_training_feat(words_per_chunk=2000000, update_file=True):
 
     vocabulary = np.load(f'{feat_base}/vocabulary.npy')
     word_set = set(vocabulary.tolist())
@@ -129,7 +129,6 @@ def extract_training_feat(words_per_chunk=2000000):
 
     chunk_num = 0
     chunk_fmt = 'train-chunk-{0}.npy'
-
     chunk_name = f'{feat_base}/{chunk_fmt}'
 
     x_buff, y_buff = [], []
@@ -138,27 +137,32 @@ def extract_training_feat(words_per_chunk=2000000):
         for words, tags in doc:
             x_buff.extend(encode(c) for c in words)
             y_buff.extend(tags)
+            # print(words)
+            # print(tags)
             if len(x_buff) >= words_per_chunk:
                 chunk = np.array([x_buff, y_buff])
-                np.save(chunk_name.format(chunk_num), chunk)
+                if update_file:
+                    np.save(chunk_name.format(chunk_num), chunk)
                 x_buff.clear()
                 y_buff.clear()
                 chunk_num += 1
 
     if len(x_buff):
         chunk = np.array([x_buff, y_buff])
-        np.save(chunk_name.format(chunk_num), chunk)
+        if update_file:
+            np.save(chunk_name.format(chunk_num), chunk)
         chunk_num += 1
 
-    pd.DataFrame(
-        data=np.array([[chunk_num, chunk_fmt]]),
-        columns=('chunk_num', 'chunk_fmt')
-    ).to_pickle(f'{feat_base}/train-meta')
+    if update_file:
+        pd.DataFrame(
+            data=np.array([[chunk_num, chunk_fmt]]),
+            columns=('chunk_num', 'chunk_fmt')
+        ).to_pickle(f'{feat_base}/train-meta')
 
 
 if __name__ == '__main__':
     # build_vocabulary()
-    # extract_training_feat()
+    extract_training_feat(update_file=False)
 
     # for doc in list_test_doc():
     #     for x, y in doc:

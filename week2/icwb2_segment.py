@@ -16,14 +16,14 @@ def load_training_sequence():
         yield np.load(chunk)
 
 
-def train(smooth_k=None):
+def train(smooth_output=None, smooth_state=None):
     vocabulary = np.load(f'{feat_base}/vocabulary.npy')
     state_num, output_num = len(Tag) - 1, len(vocabulary)
 
-    if smooth_k is None:
-        smooth_k = 1
-    elif isinstance(smooth_k, np.ndarray):
-        smooth_k = smooth_k.reshape((4, 1))
+    if isinstance(smooth_output, np.ndarray):
+        smooth_output = smooth_output.reshape((4, 1))
+    if isinstance(smooth_state, np.ndarray):
+        smooth_state = smooth_state.reshape((4, 1))
 
     # index -1 is state0 (Tag.SEP)
     bi_state_count = np.zeros((state_num+1, state_num), dtype=np.int64)
@@ -47,21 +47,35 @@ def train(smooth_k=None):
     np.save(f'{feat_base}/state_count.npy', bi_state_count)
     np.save(f'{feat_base}/output_count.npy', bi_output_count)
 
+    def laplace_smoothing(numerator, denominator, v, k):
+        laplace_numerator = numerator + k
+        laplace_denominator = denominator + (v * k)
+        return np.nan_to_num(laplace_numerator / laplace_denominator)
+
     with np.errstate(divide='ignore', invalid='ignore'):
-        state_transfer_mat = np.nan_to_num(
-            bi_state_count / bi_state_count.sum(axis=1).reshape(-1, 1))
+        if smooth_state is not None:
+            state_transfer_mat = laplace_smoothing(
+                bi_state_count, bi_state_count.sum(axis=1).reshape(-1, 1),
+                state_num, smooth_state)
+        else:
+            state_transfer_mat = np.nan_to_num(
+                bi_state_count / bi_state_count.sum(axis=1).reshape(-1, 1))
 
-        laplace_numerator = bi_output_count + smooth_k
-        laplace_denominator = bi_output_count.sum(axis=1).reshape(-1, 1) + (output_num * smooth_k)
-        output_probability_mat = np.nan_to_num(laplace_numerator / laplace_denominator)
+        if smooth_output is not None:
+            output_emit_mat = laplace_smoothing(
+                bi_output_count, bi_output_count.sum(axis=1).reshape(-1, 1),
+                output_num, smooth_output)
+        else:
+            output_emit_mat = np.nan_to_num(
+                bi_output_count / bi_output_count.sum(axis=1).reshape(-1, 1))
 
-        unknown_output_prob = 1. - output_probability_mat.sum(axis=1).reshape(-1, 1)
-        output_probability_mat = np.append(output_probability_mat, unknown_output_prob, axis=1)
+        unknown_output_prob = 1. - output_emit_mat.sum(axis=1).reshape(-1, 1)
+        output_emit_mat = np.append(output_emit_mat, unknown_output_prob, axis=1)
 
         print(unknown_output_prob)
 
     np.save(f'{feat_base}/state_trans.npy', state_transfer_mat)
-    np.save(f'{feat_base}/output_prob.npy', output_probability_mat)
+    np.save(f'{feat_base}/output_emit.npy', output_emit_mat)
 
 
 def viterbi_search(seq, state_prob_mat, output_prob_mat):
@@ -93,7 +107,13 @@ def viterbi_search(seq, state_prob_mat, output_prob_mat):
 def validate():
 
     state_trans_mat = np.load(f'{feat_base}/state_trans.npy')
-    output_prob_mat = np.load(f'{feat_base}/output_prob.npy')
+    output_emit_mat = np.load(f'{feat_base}/output_emit.npy')
+    # print(state_trans_mat.shape)
+    # print(output_emit_mat.shape)
+    # print(state_trans_mat.sum(axis=1))
+    # print(state_trans_mat)
+    # print(output_emit_mat.sum(axis=1))
+    # print(output_emit_mat)
 
     vocabulary = np.load(f'{feat_base}/vocabulary.npy')
     word_set = set(vocabulary.tolist())
@@ -107,36 +127,31 @@ def validate():
         assert len(text) == len(tags)
 
         buff, tokens = [], []
-
-        def flush():
-            tokens.append(''.join(buff))
-            buff.clear()
-
         for i in range(len(tags)):
             buff.append(text[i])
             if tags[i] in (Tag.FIN.value, Tag.END.value):
-                flush()
+                tokens.append(''.join(buff))
+                buff.clear()
 
         if len(buff):
-            flush()
+            tokens.append(''.join(buff))
+            buff.clear()
 
         return tokens
 
     def shrink(tags):
-        idx, mixture = None, []
+        p, mixture = None, []
         for i in range(len(tags)):
             if tags[i] in (Tag.FIN.value, Tag.END.value):
-                mixture.append((i if idx is None else idx << 32) | i)
-                # pos.append((i if idx is None else idx, i))
-                idx = None
-            elif idx is None:
-                idx = i
-        if idx is not None:
-            mixture.append((idx << 32) | (len(tags) - 1))
-            # pos.append((idx, len(tags)-1))
+                mixture.append((i if p is None else p << 32) | i)
+                p = None
+            elif p is None:
+                p = i
+        if p is not None:
+            mixture.append((p << 32) | (len(tags) - 1))
         return set(mixture)
-        # return pos
 
+    total, correct, error = 0, 0, 0
     for doc in list_test_doc():
         for x, y in doc:
             sample = traverse_doc(x, [], None, converter=ch_to_int)
@@ -144,18 +159,25 @@ def validate():
             if len(sample) < 2:
                 continue
 
-            guess = viterbi_search(sample, state_trans_mat, output_prob_mat)
-            predict, expect = shrink(guess), shrink(target)
+            guess = viterbi_search(sample, state_trans_mat, output_emit_mat)
+            # print(decode(sample, guess))
 
+            predict, expect = shrink(guess), shrink(target)
             diff = predict.difference(expect)
-            err_num, right_num = len(diff), len(predict) - len(diff)
-            # if len(diff) > 5:
-            #     print(decode(x, guess))
-            #     print(y)
+            correct += len(predict) - len(diff)
+            error += len(diff)
+            total += len(expect)
+
+    recall = correct/total
+    precision = correct/(correct + error)
+
+    print(f'Recall: {recall}')
+    print(f'Precision: {precision}')
 
 
 if __name__ == '__main__':
-    # train(smooth_k=np.array([1, 1, 10000000000, 1]))
+    # train(smooth_output=np.array([1, 1, 10000000000, 1]))
+    # train(smooth_state=1)
     validate()
     pass
 
